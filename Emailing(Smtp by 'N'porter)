@@ -11,8 +11,8 @@ import smtplib
 def sendEmail(emailtext, fromEmail, fromEmailPW, toEmail):
     msg = MIMEMultipart('alternative')
     msg['To'] = 'xxx@naver.com'
-    msg['Subject'] = 'Coin Notification!!!'
-    msg['From'] = formataddr((str(Header('Python Coin', 'utf-8')), 'xxx@naver.com'))
+    msg['Subject'] = 'Notification!!!'
+    msg['From'] = formataddr((str(Header('Python', 'utf-8')), 'xxx@naver.com'))
     part1 = MIMEText(emailtext, 'plain')
     msg.attach(part1)
     #server = smtplib.SMTP('smtp.gmail.com', 587)
@@ -27,4 +27,4 @@ def sendEmail(emailtext, fromEmail, fromEmailPW, toEmail):
     'successfully sent the email'
     
     
-dct=sendEmail("market : %s" % markets, 'xxx@naver.com', 'dnpaqmffl51!', 'xxx@naver.com')    
+dct=sendEmail("market : %s" % markets, 'xxx@naver.com', 'yyyy', 'xxx@naver.com')    
