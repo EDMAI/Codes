@@ -1,0 +1,206 @@
+###################################################
+# CRM데이터 전처리 (Pandas & pivot)
+###################################################
+# -*- coding: utf-8 -*-
+# '금액'칼럼이 있는 파일, 없는 파일에 따라 구분
+ 
+
+import pandas as pd
+import datetime
+import re
+import numpy as np
+from pandas.core.reshape.pivot import pivot_table
+ 
+
+print('파일명?')    
+nameele=input()     
+filename=nameele+'.csv'
+df=pd.read_csv("C:\\Users\\data\\Desktop\\files\\crmdata\\실적파일\\%s" % filename, engine='python')
+print('첫번째 파일 길이 :', len(df))  
+
+
+df=df[df['취급']=='신규']
+df=df[df['경로']!='접수']
+df=df[df['신청']!='소개']
+
+
+col=[]
+for x in df.columns:
+    col.append(x)
+print("col : ",col)
+    
+if '금액' in col: 
+    df=df[['인덱스','실행일시','취합일자','키워드']]
+    df2=pd.DataFrame(columns=['매체','값'])
+    df3=pd.concat([df,df2],axis=1)
+    print(1)
+
+    
+    #performance 측정을 위한 칼럼 뽑아내기     
+    c1=[]
+    c2=[]
+    c3=[]    
+    매체=[]
+    for x in df['접수']:
+        c1.append(x)    
+    for x in df['광고']:
+        c2.append(x)    
+    for x in df['기기']:
+        c3.append(x)    
+    for x in range(0,len(c1)):
+        매체.append(str(c1[x])+str(c2[x])+str(c3[x]))
+    print(매체)
+     
+    #값 붙여넣기
+    value=[]
+    for x in range(0,len(c1)):
+        value.append(float(1))    
+    
+    additionaldata={'매체':매체,'값':value}
+    df3['매체']=매체
+    df3['값']=value
+    
+    
+
+else :     
+    df=df[['인덱스','실행일시','취합일자','키워드']]
+    df2=pd.DataFrame(columns=['매체','값'])
+    df3=pd.concat([df,df2],axis=1)
+     
+    c1=[]
+    c2=[]
+    c3=[]    
+    매체=[]
+    for x in df['접수']:
+        c1.append(x)    
+    for x in df['광고']:
+        c2.append(x)    
+    for x in df['기기']:
+        c3.append(x)    
+    for x in range(0,len(c1)):
+        매체.append(str(c1[x])+str(c2[x])+str(c3[x]))
+    print(매체)
+     
+    #값 붙여넣기, 값은 float으로 해야 계산이 수월하다
+    value=[]
+    for x in range(0,len(c1)):
+        value.append(float(1))    
+    
+    additionaldata={'매체':매체,'값':value}
+    df3['매체']=매체
+    df3['값']=value
+
+
+#----------------<<CRM데이터 구분>>-------------------------------
+# 칼럼명에 '금액'이 있느냐 없느냐에 따라 승인과 접수를 구분
+# CRM 데이터 항목별로 칼럼위치 수정
+# Pivot을 통한 데이터 취합
+#-------------------------------------------------------
+    
+
+col=[]
+for x in df3.columns:
+    col.append(x)
+print("col : ",col)
+
+
+if '금액' in col:        
+    #금액칼럼 중, 값이 0인 행을 찾고 해당 행 제거. 
+    findloanequal0=[]
+    for x in range(0,len(df3)):
+        findloanequal0.append(df3.ix[:,'금액'].values[x]) 
+    
+    #쉼표를 제거해서 모두 숫자로 만들고, 거기에서 0의 순서(idxnum)를 출력한다. 
+    print(findloanequal0)
+    findloanequal0tofloat=[]
+    idxnum=[]
+    for x in findloanequal0:
+        findloanequal0tofloat.append(float(str(x).replace(",","")))
+    data={'금액_float':findloanequal0tofloat}
+    df_0data=pd.DataFrame(data={'금액_float':findloanequal0tofloat},columns=['금액_float'])#dataframe을 만들때 columns에 꼭 대괄호를 해줘야 한다.
+    
+    
+    #concat을 위해 df3의 인덱스를 리셋한다.
+    df3=df3.reset_index(drop=True)
+    df4=pd.concat([df3,df_0data],axis=1)
+    
+    #전체칼럼 객체로 df4의 칼럼 위치 수정 후 출력 
+    전체칼럼=['인덱스','실행일시','취합일자','키워드']
+    df4=df4[전체칼럼]
+    
+    
+    #df4의 매체 칼럼에서 네이버SAPC, 네이버SAMOBILE만 뽑아낸다.
+    df4=df4[(df4.매체=='네이버SAMOBILE') | (df4.매체=='네이버SAPC')]
+    
+    #pivot table을 만든다.
+    table=pivot_table(df4,values=['값','금액_float'],index=['매체','키워드'],aggfunc={'값':np.sum,'금액_float':np.sum})
+
+    
+    #취합일자 칼럼을 만들어서 덧붙인다. 
+    피벗취합일자=[]
+    for x in range(0,len(table)):
+        피벗취합일자.append(df4.ix[:,'취합일자'].values[x]) 
+            
+    
+    data={'피벗취합일자':피벗취합일자}
+    df_date=pd.DataFrame(data={'피벗취합일자':피벗취합일자},columns=['피벗취합일자'])#dataframe을 만들때 columns에 꼭 대괄호를 해줘야 한다.
+    
+    table=table.reset_index()
+    df5=pd.concat([table,df_date],axis=1)
+    
+    #칼럼순서설정 및 출력
+    전체칼럼=['인덱스','실행일시','취합일자','키워드']
+    df5=df5[전체칼럼]
+    
+    #file export
+    print("#"*40)
+    now = datetime.datetime.now()
+    # nowDate2 = now2.strftime('%y%m%d-%H%M')
+    nowDate = now.strftime('%H%M%S')        
+    outputfilename='네이버승인실적_'+filename
+    print(outputfilename) 
+
+    df5.to_csv("C:\\Users\\data\\Desktop\\files\\crmdata\\실적파일\\%s" % outputfilename,encoding="euc_kr",index=False)
+    
+        
+    
+
+else :       
+    #전체칼럼 객체로 df4의 칼럼 위치 수정 후 출력 
+    전체칼럼=['인덱스','실행일시','취합일자','키워드']
+    df4=df3[전체칼럼]
+    
+    
+    #df4의 매체 칼럼에서 네이버SAPC, 네이버SAMOBILE만 뽑아낸다.
+    df4=df4[(df4.매체=='네이버SAMOBILE') | (df4.매체=='네이버SAPC')]
+    
+    #pivot table을 만든다.
+    table=pivot_table(df4,values=['값'],index=['매체','승인키워드'],aggfunc={'값':np.sum})
+
+    
+    #취합일자 칼럼을 만들어서 덧붙인다. 
+    피벗취합일자=[]
+    for x in range(0,len(table)):
+        피벗취합일자.append(df4.ix[:,'취합일자'].values[x]) 
+            
+    
+    data={'피벗취합일자':피벗취합일자}
+    df_date=pd.DataFrame(data={'피벗취합일자':피벗취합일자},columns=['피벗취합일자'])#dataframe을 만들때 columns에 꼭 대괄호를 해줘야 한다.
+    
+    table=table.reset_index()
+    df5=pd.concat([table,df_date],axis=1)
+
+    #칼럼순서설정 및 출력
+    전체칼럼=['피벗취합일자','매체', '승인키워드', '값']
+    df5=df5[전체칼럼]
+        
+    #file export
+    print("#"*40)
+    now = datetime.datetime.now()
+    # nowDate2 = now2.strftime('%y%m%d-%H%M')
+    nowDate = now.strftime('%H%M%S')        
+    outputfilename='네이버접수실적_'+filename
+    print(outputfilename) 
+
+    df5.to_csv("C:\\Users\\data\\Desktop\\files\\crmdata\\실적파일\\%s" % outputfilename,encoding="euc_kr",index=False)    
+    
