@@ -1,0 +1,41 @@
+import winsound
+import pandas as pd
+import datetime
+import smtplib
+import re
+import time
+import urllib
+
+from selenium import webdriver
+from selenium.webdriver.support import expected_conditions as EC 
+from http.client import IncompleteRead
+from selenium.webdriver.common.by import By
+
+
+driver=webdriver.Chrome("C:\\Program Files (x86)\\Google\\Chrome\\Application\\chromedriver.exe")
+driver.get("https://www.binance.com/vote.html")
+time.sleep(3)
+element1=driver.find_element_by_xpath("/html/body/div[2]/div/div[1]/div/h3").text
+ 
+print(element1)
+
+
+while True:    
+    driver.refresh()
+    time.sleep(3)
+    element2=driver.find_element_by_xpath("/html/body/div[2]/div/div[1]/div/h3").text
+     
+    if element1==element2:
+        print("ok")
+    else :
+        s=datetime.datetime.now()
+        print('vote site changed : ', element2)
+        print('now time :', s)        
+        Freq = 2000 # Set Frequency To 2500 Hertz
+        Dur = 1000 # Set Duration To 1000 ms == 1 second
+        winsound.Beep(Freq,Dur);time.sleep(1)        
+        break
+    time.sleep(3)
+
+
+
