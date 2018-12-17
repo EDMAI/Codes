@@ -1,5 +1,5 @@
 ###################################################
-# 매체 크롤링#1
+# 매체 크롤링 #1
 ###################################################
 # -*- coding: utf-8 -*-
 # selenium을 이용한 크롤링
@@ -42,9 +42,9 @@ time.sleep(3)
 #     pass    
 
 time.sleep(1)
-driver.find_element_by_xpath("//*[@id=\"member_id\"]").send_keys("woorident")
+driver.find_element_by_xpath("//*[@id=\"member_id\"]").send_keys("id")
 time.sleep(1)
-driver.find_element_by_xpath("//*[@id=\"member_passwd\"]").send_keys("a1234")
+driver.find_element_by_xpath("//*[@id=\"member_passwd\"]").send_keys("password")
 time.sleep(1)
 
 driver.find_element_by_xpath("//*[@id=\"main\"]/div[3]/div/form/div/div[1]/input[3]").click()
