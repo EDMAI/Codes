@@ -1,0 +1,314 @@
+###################################################
+# API 거래시스템
+###################################################
+# -*- coding: utf-8 -*-
+# 'U'거래소 API library 모듈 insert 후 실행
+
+
+#----------------<<API 개관>>-------------------------------
+# 'ready'가 order을 통해 ok로 변하면 루프종료, order하지 않으면 계속적으로 still process 상태
+# 호가 탐색 중, 매수 1호가와 매도 1호가 사이에 1.05%의 간격이 발생할 경우를 Finding
+# 이메일링 시스템 적용
+# 호가단위 적용하여 5,10,100,1000원의 경우 각기 다른 매수호가 적용
+# 제시한 ask위에 새로운 ask가 생길 경우 uuid로 취소, 그 위에 새로운 ask제시
+#-------------------------------------------------------
+
+upbit = Upbitpy()
+ready='still process'  
+
+def orderprocess():
+    global ready,bidprice,askprice,Betting_Prices,markets,volume
+    url = "https://api.upbit.com/v1/market/all"
+    response = requests.request("GET", url)
+    r1=response.text    
+    r2=re.compile("KRW-[A-Z]+")
+    coins=r2.findall(r1)    
+        
+    differ=[]   
+    price1=[]
+    price2=[]        
+    
+    
+         
+    while True:
+        if differ==[]:
+            time.sleep(0.50)
+            #현재시간 출력
+            nowtime=datetime.datetime.now()                                
+            now=nowtime.strftime('%H:%M:%S')                
+            print('searching... %s '% now)
+            for x in coins:    
+                
+                
+                url = "https://api.upbit.com/v1/orderbook"
+                markets=x
+                querystring = {"markets":markets}                
+                response = requests.request("GET", url, params=querystring)
+                
+                r1=response.text
+                r2=re.compile("\"ask_price\":[\d.]+")
+                r3=r2.findall(r1)
+                
+                r4=re.compile("[\d.+]")
+                orderele=[]
+                for x in r3:
+                    price=r4.findall(x)    
+                    orderele.append("".join(price))
+                    
+                askprice=[]
+                for x in orderele:
+                    x=float(x)
+                    askprice.append(x)    
+                        
+            
+                r1=response.text
+                r2=re.compile("\"bid_price\":[\d.]+")
+                r3=r2.findall(r1)
+                
+                r4=re.compile("[\d.+]")
+                orderele=[]
+                for x in r3:
+                    price=r4.findall(x)    
+                    orderele.append("".join(price))
+                    
+                bidprice=[]
+                for x in orderele:
+                    x=float(x)
+                    bidprice.append(x)  
+                      
+                try:   
+                    if askprice[0]>bidprice[0]*1.02 : #첫 매도호가가 매수호가의 1.02배를 넘으면 differ변수로 설정              
+                        differ.append(markets)  
+                        price1.append(bidprice[0])
+                        price2.append(askprice[0])          
+                    else : 
+                        pass
+                except :
+                    pass                    
+                
+                if differ==markets:#krw로 계속적으로 루프를 도는 도중, markets으로 선정된 코인은 한 번 print하며, 선정되지 않은 코인으로 루프를 돌면 인쇄하지 않음.
+                    print("differ!! :", differ) 
+            
+        else:
+            break
+    
+    print('#'*17, ' 타겟포착 ', '#'*17)
+    differlist=[]#코인리스트 보기쉽게 krw를 빼고 출력
+    for x in differ:
+        differlist.append(str(x).replace('KRW-', ''))                
+        
+        
+    #타겟코인과 코인의 매수호가,매도호가 세팅        
+    target=[]
+    targetbidprice=[]
+    targetaskprice=[]
+    ratio=[]
+    volume=[]
+    for x in range(0,len(differlist)):
+        target.append(differlist[x])
+        targetbidprice.append(price1[x])
+        targetaskprice.append(price2[x])
+        ratio.append(round(price2[x]/price1[x],3))
+
+    #타겟코인의 volume 세팅            
+    for x in differ:
+        volumeele=upbit.get_ticker([x])
+        volume.append(int(round(volumeele[0]['acc_trade_price_24h'],0)))
+    print("volume :", volume)        
+        
+        
+        
+    order_data={'target': target, 'bid_order':targetbidprice,'ask_order':targetaskprice,'ratio':ratio, 'volume':volume}
+    orderbook=pd.DataFrame(order_data,columns=['bid_order','ask_order','volume','ratio'],index=target)
+    orderbook=orderbook.sort_values(by=['ratio'],axis=0,ascending=False)
+    print(orderbook)
+    
+    
+
+    #differ 변수 중, 가장 높은 배율을 가진 코인을 매수타겟코인으로 설정
+    rank=[]
+    for x in range(0,len(differ)):
+        rank.append(price2[x]/price1[x])
+    maxrank=max(rank)
+    
+    #코인을 max(rank)로 할 것인지, 내가 지정한 코인으로 할 것인지 input으로 지정
+    print(differ)
+    anotherrank=input("원하는 코인의 번호는?\n있으면 해당 코인의 번호, 없으면 x\n")       
+    print("행운을 빕니다! ", anotherrank+"번!!")
+    
+    if anotherrank=='x':
+        maxindex=rank.index(maxrank)
+    else : 
+        maxindex=int(anotherrank)
+        
+    #지정된 번호로 코인이름 지정 및 해당코인의 매수호가, 매도호가 설정
+    markets=differ[maxindex]
+    bidprice=price1[maxindex] #해당코인의 가격으로 설정
+    askprice=price2[maxindex] #해당코인의 가격으로 설정
+    
+    
+    
+    #가격에 따른 호가단위 설정
+    if askprice>=0 and askprice<10:
+        Betting_Prices=0.01
+    if askprice>=10 and askprice<100:
+        Betting_Prices=0.1
+    if askprice>=100 and askprice<1000:    
+        Betting_Prices=1
+    if askprice>=1000 and askprice<10000:         
+        Betting_Prices=5
+    if askprice>=10000 and askprice<100000:    
+        Betting_Prices=10
+    if askprice>=100000 and askprice<500000:        
+        Betting_Prices=50
+    if askprice>=500000 and askprice<1000000:     
+        Betting_Prices=100   
+    if askprice>=1000000 and askprice<2000000:
+        Betting_Prices=500
+    if askprice>=2000000 and askprice<2000000000:
+        Betting_Prices=1000                                                 
+        
+    
+    #주문금액과 볼륨설정
+    tot_amount=50000
+    volume=tot_amount/askprice
+    
+    try :   
+        if askprice>=bidprice*1.02+Betting_Prices : #첫 매도호가가 매수호가의 1.02배를 넘으면 오더, 넘지 못하면 매수 안함            
+            ready='ok'                                              
+            order0=upbit.order(markets, 'bid', volume, bidprice+Betting_Prices)
+            dct=sendEmail("market : %s / bidprice : %s / askprice : %s" % (markets, bidprice, askprice), 'gondola12@naver.com', 'dnpaqmffl51!', 'gondola12@naver.com')
+    except Exception as e:
+        print(e)
+        print('tot_amount :', tot_amount)
+
+
+
+while True:    
+    print("ready : ", ready)    
+    if ready!='ok':
+        time.sleep(0.22)
+        processstart=orderprocess()
+    else :
+        break
+    
+
+#베팅한 금액, bidprice,betting_prices,markets를 기준가로 설정  
+nowprice=bidprice+Betting_Prices
+
+
+
+#매수 주문 이후 호가 상황에 대한 review
+#마켓이름,매수호가,매도호가,매수가상향시 최대한도
+currentorder=[markets,bidprice+Betting_Prices,askprice,round(nowprice*1.005,3)]
+print('호가변동 탐색중 /', "market : %s / bidprice : %s / askprice : %s" % (currentorder[0],currentorder[1],currentorder[2]),'/ 매수가한도 : ', currentorder[3])
+
+
+#매수호가루프, 매도호가루프도 추가해야함.
+while True :#bidprice*1.02보다 askprice가 작으면 주문 곧장 취소, 대기           
+    url = "https://api.upbit.com/v1/orderbook"    
+    querystring = {"markets":markets}
+    response = requests.request("GET", url, params=querystring)
+     
+    r1=response.text
+    r2=re.compile("\"ask_price\":[\d.]+")
+    r3=r2.findall(r1)
+    print()
+     
+    r4=re.compile("[\d.+]")
+    orderele=[]
+    for x in r3:
+        price=r4.findall(x)    
+        orderele.append("".join(price))
+         
+    askprice=[]
+    for x in orderele:
+        x=float(x)
+        askprice.append(x)
+    print("orderele : ", orderele)    
+    print("askprice : ", askprice)
+             
+     
+     
+    r1=response.text
+    r2=re.compile("\"bid_price\":[\d.]+")
+    r3=r2.findall(r1)
+     
+    r4=re.compile("[\d.+]")
+    orderele=[]
+    for x in r3:
+        price=r4.findall(x)    
+        orderele.append("".join(price))
+         
+    bidprice=[]
+    for x in orderele:
+        x=float(x)
+        bidprice.append(x)      
+
+    #내가 매수한 주문가보다 높고(1.005 배율 안에서), 매수1호가*1.02보다 매도 1호가가 더 크며, 경우, 취소하고 그 위에 쌓음           
+    if bidprice[0]!=nowprice and nowprice<=currentorder[3] and askprice[0]>=bidprice[0]*1.02:        
+        try:                   
+            #주문 취소를 위한 코인 uuid 조회과정 
+            search=upbit.get_orders(markets, 'wait')                        
+              
+#             모든 uuid 체크
+#             for x in range(0,len(search)):
+#                 print("search[%d]['uuid'] : " % x,search[x]['uuid']+''+search[x]['price'])
+                
+                 
+    # # 가장 최근 주문 하나 취소하기(uuid로)
+    # cancel=upbit.cancel_order(search[0]['uuid'])
+      
+#     # uuid 확인 후 모두 취소하고 다시 재주문
+#             for x in range(0,len(search)):
+#                 cancel=upbit.cancel_order(search[x]['uuid'])        
+#                 order1=upbit.order(markets, 'bid', volume, bidprice[0]+Betting_Prices) #재주문하기
+#                 nowprice=bidprice[0]+Betting_Prices
+
+    # uuid 확인 후 취소하고 다시 재주문            
+            cancel=upbit.cancel_order(search[0]['uuid'])        
+            order1=upbit.order(markets, 'bid', volume, bidprice[0]+Betting_Prices) #재주문하기
+            nowprice=bidprice[0]+Betting_Prices
+            
+            #수정된 uuid와 해당 bid의 매수가격 조회 
+            print('#'*15 + '가격 상향'+'#'*15)
+            print("search[0]['uuid'] : ",search[0]['uuid'])
+            print("수정가격 : ", search[0]['price'])
+            print('#'*15 + '가격 상향'+'#'*15)
+            
+        except Exception as e:
+            print(Exception)
+            
+    
+    
+    #내가 매수한 주문가 아래에 호가가 없을 경우, 취소하고 그 아래에 쌓음
+    if bidprice[1]!=bidprice[0]-Betting_Prices and askprice[0]>=bidprice[0]*1.02:        
+        try:                   
+            #주문 취소를 위한 코인 uuid 조회과정 
+            search=upbit.get_orders(markets, 'wait')            
+            
+            cancel=upbit.cancel_order(search[0]['uuid'])        
+            order1=upbit.order(markets, 'bid', volume, bidprice[0]-Betting_Prices) #재주문하기
+            nowprice=bidprice[0]-Betting_Prices
+
+            #수정된 uuid와 해당 bid의 매수가격 조회 
+            print('#'*15 + '가격 하향'+'#'*15)
+            print("search[0]['uuid'] : ",search[0]['uuid'])
+            print("수정가격 : ", search[0]['price'])
+            print('#'*15 + '가격 하향'+'#'*15)            
+            
+        except Exception as e:
+            print(Exception)            
+    
+    time.sleep(0.22) #최소 업비트 루프0.22
+    # 주문 취소버튼 누르면 search가 종료되어 루프도 종료
+    search=1
+    if search==1 or search!=[]:
+        pass    
+    else : 
+        break
+      
+
+
+
+   
