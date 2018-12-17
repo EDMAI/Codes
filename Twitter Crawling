@@ -1,0 +1,219 @@
+###################################################
+# 파이썬 트위터 크롤링
+###################################################
+import pandas as pd
+twits=pd.read_csv("C:\\Users\\Desktop\\investment\\twit1.csv",encoding='cp949')
+https=twits.ix[:,1]
+labels=twits.ix[:,0]
+
+from http.client import IncompleteRead
+from urllib.request import urlopen
+from bs4 import BeautifulSoup
+import datetime
+import smtplib
+import re
+import time
+import urllib
+import urllib.error
+import errno
+import winerror
+
+
+
+###################################################
+# 이메일링 리스트, 네이버 smtp 서버 이용
+###################################################
+
+global customer
+customer = ['1234@gamil.com', '5678@gmail.com']
+
+ 
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.header import Header
+from email.utils import formataddr
+def sendEmail(emailtext, fromEmail, fromEmailPW, toEmail):
+    msg = MIMEMultipart('alternative')
+    to_users = customer  
+    msg["to"] = ", ".join(to_users)      
+    msg['Subject'] = 'alarm'
+    msg['From'] = formataddr((str(Header('alarm', 'utf-8')), '1234@naver.com'))
+    part1 = MIMEText(emailtext, 'plain')
+    msg.attach(part1)
+    #server = smtplib.SMTP('smtp.gmail.com', 587)
+    server = smtplib.SMTP_SSL('smtp.naver.com', 465)
+    server.ehlo()
+    print("########### " + fromEmail + " " + fromEmailPW+"###########")
+    server.login(fromEmail, fromEmailPW)
+    server.sendmail(fromEmail, toEmail, msg.as_string())
+    server.close()
+    print
+    'successfully sent the email'
+    
+
+
+#----------------<<crawling data>>-----------------------
+# 리트윗된 text는 제외하며,
+# 새롭게 지정한 시점 기준 이후
+# 새로운 트윗이 업데이트 될 경우
+# 지정된 메일 주소로 메일 발송함.
+#--------------------------------------------------------
+
+# crawling time
+def ctime(url):   
+    global datatime                     
+    html=urlopen(url)
+    twSoup =BeautifulSoup(html.read(),"html.parser")
+    timeObj=twSoup.findAll("div",{"id":"page-container"})
+    
+    tsObj=[]
+    for ele in timeObj:
+        ele2=ele.find_all("span")
+        for ele3 in ele2:
+            if ele3.has_attr('class'):
+                tsObj.append(ele3.get('data-time'))
+    
+    ts=[]
+    for timeObj in tsObj:
+        if timeObj!=None:
+            ts.append(timeObj)
+    ts=max(ts)
+    ts=int(ts)
+    
+    datatime=ts
+    
+
+implement=ctime('https://twitter.com/baj124123')
+print("트윗기준시간 : ", datatime)
+stantime=datatime
+
+transfered=0
+print(transfered)
+def crawling():
+    
+    while True:
+        global transfered
+        print("global transfered")
+        # 트위터 검색 설정
+        s = datetime.datetime.now()
+        print("#"*40,"\n",'루프시작시간:',s)
+        print("#"*40)            
+        cnt=0              
+        print("cnt설정")
+        
+        # parsing 
+        for twit in https:    
+            s = datetime.datetime.now()
+            print("새로운 루프 시작",s)                    
+            html=urlopen(twit)
+            print("html urlopen")
+            twSoup =BeautifulSoup(html.read(),"html.parser")
+            print(twit)
+            
+        # crawling time
+            timeObj=twSoup.findAll("div",{"id":"page-container"})
+            print("twsoup으로 attribute 추출 ")
+            tsObj=[]
+            for ele in timeObj:
+                ele2=ele.find_all("span")
+                for ele3 in ele2:
+                    if ele3.has_attr('class'):
+                        tsObj.append(ele3.get('data-time'))
+            print("html에서 data-time 추출 ")
+            ts=[]
+            for timeObj in tsObj:
+                if timeObj!=None:
+                    ts.append(timeObj)
+            ts=ts[0:2]
+            ts[0]=int(ts[0])
+            ts[1]=int(ts[1])
+            print("obj만 따로 뽑아 ts에 append")
+            # ts[0]과 ts[1] datatime과의 크기 비교 후, 
+            # (ts[0]과 ts[1]은 메인트윗, 최신트윗 혹은 최신트윗 두 건 일 것이다)  
+            # 둘 중 하나라도 datatime보다 클 경우 
+            # 리트윗 및 컨텐츠 크롤링 실행
+            
+            #메일 발송시의 시간을 기준시간으로 설정하기 위한 newtime 초기화 
+            newtime1=0;newtime2=0
+            global datatime            
+            print("global datatime")
+            #context는 리트윗이다. 
+            #content는 내용이다.
+            if ts[0]>=datatime or ts[1]>=datatime:
+                # crawling context[0,1]                    
+                twObj = twSoup.findAll("div",{"class":"context"}) 
+                tweetcontext=[]
+                for Obj in twObj:
+                    tweetcontext.append(Obj.get_text())
+                
+                tweetcontext=tweetcontext[0:2]
+                
+                retweet=[]                
+                for context in tweetcontext:
+                    r=re.compile("리트윗")
+                    retweet.append(r.findall(context))
+                
+                print("findall 리트윗 and append context ")    
+                # crawling content crawling [0,1]   
+                twObj = twSoup.findAll("div",{"class":"js-tweet-text-container"})   
+                tweetcontent=[]
+                for Obj in twObj:
+                    # get_text를 하면 리스트형태로 결괏값 반환, 
+                    # 그것을 인덱싱할 경우 첫 문장, 두 번재 문장이 반환되고
+                    # str로 형변환 할 경우 첫 번재, 두번째 문장이 반환된다.  
+                    tweetcontent.append(Obj.get_text())
+                
+                print("컨테이너의 obj에서 twitcontent로 append")     
+                # 리트윗이거나 ts[0]이 기준시간보다 작을 경우  
+                if retweet[0]!=[] or ts[0]<=datatime:   #비지 않았으면 리트윗. 비었으면 조사. 
+                    print("tweetcontext[1] was not investigated")
+                # 리트윗이 아니거나 ts[0]이 기준시간보다 클 경우 
+                else :
+                    dct=sendEmail("%s : %s\nurl : \n%s" % (labels[cnt],tweetcontent[0],twit), '1234@naver.com', 'xxxx', customer )
+                    transfered=transfered+1
+                    print("transfered : ", transfered)
+                    
+                    implement=ctime(twit)
+                    newtime1=datatime
+                print("contents 1번 pass or mailing")
+                # retweet[1]이 리트윗이거나 ts[1]이 datatime보다 작을 경우 
+                if retweet[1]!=[] or ts[1]<=datatime:    
+                    print("tweetcontext[2] was not investigated")
+                # 리트윗이 아니거나 ts[1]이 기준시간보다 클 경우 
+                else : 
+                    dct=sendEmail("%s : %s\nurl : \n%s" % (labels[cnt],tweetcontent[1],twit), '12342@naver.com', 'xxxx', customer )
+                    transfered=transfered+1
+                    print("transfered : ", transfered)
+                    
+                    implement=ctime(twit)
+                    newtime2=datatime
+                print("contents 2번 pass or mailing")
+            datatime=max(datatime,newtime1,newtime2)
+            cnt=cnt+1
+            print("한개 루프 끝 ")
+ 
+###################################################
+# 예외처리 세팅
+###################################################
+
+while True:
+    try :
+        go=crawling()
+    except TimeoutError :
+        print("timeouterror")
+        pass
+    except urllib.error.URLError:
+        print("urlliberror")
+        pass
+    except ConnectionResetError:
+        print("ConnectionResetError")
+        time.sleep(60)
+        pass
+    except IncompleteRead:
+        print("IncompleteRead")
+        pass
+        
+    
+   
+
+    
